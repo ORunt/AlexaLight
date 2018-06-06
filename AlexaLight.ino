@@ -4,153 +4,171 @@
 #include "ESPAsyncWebServer.h"
 #include <ESPAsyncTCP.h>
 #include <Hash.h>
+/*
+#include <DNSServer.h>            //Local DNS Server used for redirecting all requests to the configuration portal
+#include <ESP8266WebServer.h>     //Local WebServer used to serve the configuration portal
+#include <WiFiManager.h>          //https://github.com/tzapu/WiFiManager WiFi Configuration Magic
+*/
+
+
+/* ============== Settings ============== */
+// define only ONE code compilation
+#define LOUNGE_SWITCH
+//#define BATHROOM_SWITCH
+//#define CAMS_SWITCH
+
+#define BUTTON_DELAY  400
+/* ====================================== */
+
+
 
 #define WIFI_SSID "CamsBay"
 #define WIFI_PASS "randal5544"
 #define SERIAL_BAUDRATE   115200
 
+#define RELAY_1   4
+#define RELAY_2   5
+#define RELAY_3   16
+#define BTN_1     14
+#define BTN_2     12
+#define BTN_3     13
+#define LED_CFG   2
+
+/* --------- global variables --------- */
 fauxmoESP fauxmo;
-#define RELAY_PASSAGE   4
-#define RELAY_KITCHEN   5
-#define RELAY_LOUNGE    16
-const int  btn_passage = 14;
-const int  btn_kitchen = 12;
-const int  btn_lounge = 13;
-
-//int btn_state_passage = 0;
-//int btn_state_kitchen = 0;
-//int btn_state_lounge = 0;
-
-//int lastButtonState = 0;     // previous state of the button
-
-// -----------------------------------------------------------------------------
-// Wifi
-// -----------------------------------------------------------------------------
-
-void wifiSetup() {
-
-    // Set WIFI module to STA mode
-    WiFi.mode(WIFI_STA);
-
-    // Connect
-    Serial.printf("[WIFI] Connecting to %s ", WIFI_SSID);
-    WiFi.begin(WIFI_SSID, WIFI_PASS);
-
-    // Wait
-    while (WiFi.status() != WL_CONNECTED) {
-        Serial.print(".");
-        delay(100);
-    }
-    Serial.println();
-
-    // Connected!
-    Serial.printf("[WIFI] STATION Mode, SSID: %s, IP address: %s\n", WiFi.SSID().c_str(), WiFi.localIP().toString().c_str());
-}
-
-void callback(uint8_t device_id, const char * device_name, bool state) {
-  int relay = 0;
-  Serial.print("Device "); Serial.print(device_id); Serial.print(device_name); 
-  Serial.print(" state: ");
-  
-  switch (device_id) 
-  {
-    case 0:
-      relay = RELAY_PASSAGE;
-      break;
-    case 1:
-      relay = RELAY_KITCHEN;
-      break;
-    case 2:
-      relay = RELAY_LOUNGE;
-      break;
-    default:
-    return;
-  }
-  
-  if (state) {
-    Serial.println("ON");
-    digitalWrite(relay, HIGH);
-  } else {
-    Serial.println("OFF");
-    digitalWrite(relay, LOW);
-  }
-}
+int led_cfg_brightness = 200;
 
 void setup() {
-    pinMode(RELAY_PASSAGE, OUTPUT);
-    pinMode(btn_passage, INPUT);
-    pinMode(RELAY_KITCHEN, OUTPUT);
-    pinMode(btn_kitchen, INPUT);
-    pinMode(RELAY_LOUNGE, OUTPUT);
-    pinMode(btn_lounge, INPUT);
-    
-    digitalWrite(RELAY_PASSAGE, LOW);
-    digitalWrite(RELAY_KITCHEN, LOW);
-    digitalWrite(RELAY_LOUNGE, LOW);
-    
-    // Init serial port and clean garbage
-    Serial.begin(SERIAL_BAUDRATE);
-    Serial.println("FauxMo demo sketch");
-    Serial.println("After connection, ask Alexa/Echo to 'turn <devicename> on' or 'off'");
+  Serial.begin(SERIAL_BAUDRATE);
+  pinSetup();
+  wifiSetup();
 
-    // Wifi
-    wifiSetup();
+  // fauxmo
+  fauxmo.enable(true);
+  addDevices();
+  
+  fauxmo.onSetState([](unsigned char device_id, const char * device_name, bool state) {
+      foxSet(device_id, device_name, state);
+  });
 
-    fauxmo.enable(true);
-    // Fauxmo
-    fauxmo.addDevice("the kitchen light");  // Device 0
-    fauxmo.addDevice("the lounge light");   // Device 1
-    fauxmo.addDevice("the passage light");  // Device 2
-    
-    fauxmo.onMessage(callback);
+  fauxmo.onGetState([](unsigned char device_id, const char * device_name) {
+      return foxGet(device_id, device_name);
+  });
 }
 
 void loop() {
   fauxmo.handle();
-  
-  if(digitalRead(btn_passage))
-  {
-    if(digitalRead(RELAY_PASSAGE))
-    {
-      digitalWrite(RELAY_PASSAGE, LOW);
-      Serial.println("passage off");
-    }
-    else
-    {
-      digitalWrite(RELAY_PASSAGE, HIGH);
-      Serial.println("passage on");
-    }
-    delay(1000);
-  }
-  
-  if(digitalRead(btn_kitchen))
-  {
-    if(digitalRead(RELAY_KITCHEN))
-    {
-      digitalWrite(RELAY_KITCHEN, LOW);
-      Serial.println("kitchen off");
-    }
-    else
-    {
-      digitalWrite(RELAY_KITCHEN, HIGH);
-      Serial.println("kitchen on");
-    }
-    delay(1000);
-  }
-  
-  if(digitalRead(btn_lounge))
-  {
-    if(digitalRead(RELAY_LOUNGE))
-    {
-      digitalWrite(RELAY_LOUNGE, LOW);
-      Serial.println("lounge off");
-    }
-    else
-    {
-      digitalWrite(RELAY_LOUNGE, HIGH);
-      Serial.println("lounge on");
-    }
-    delay(1000);
-  }
-  delay(50);
+  //delay(50);
 }
+
+/*
+void setupAutoWifiAp(){
+    WiFiManager wifiManager;
+    wifiManager.setConfigPortalTimeout(180);
+    wifiManager.setAPCallback(configModeCallback);
+    wifiManager.autoConnect(AP_NAME);
+    analogWrite(CONFIG_LIGHT,200);
+}*/
+
+void wifiSetup() {
+  Serial.printf("[WIFI] Trying to connect ");
+  //setupAutoWifiAp();
+  
+  // Wait
+  while (WiFi.status() != WL_CONNECTED) {
+      Serial.print(".");
+      delay(100);
+  }
+  
+  // Connected!
+  Serial.printf("\n[WIFI] STATION Mode, SSID: %s, IP address: %s\n", WiFi.SSID().c_str(), WiFi.localIP().toString().c_str());
+}
+
+int getRelayNum(uint8_t device_id){
+  switch (device_id) 
+  {
+    case 0: return RELAY_1;
+    case 1: return RELAY_2;
+    case 2: return RELAY_3;
+    default: return 0;
+  }
+}
+
+void foxSet(uint8_t device_id, const char * device_name, bool state){
+  Serial.printf("[MAIN] Set: Device #%d (%s) state: %s\n", device_id, device_name, state ? "ON" : "OFF");
+  digitalWrite(getRelayNum(device_id), state);
+}
+
+uint8_t foxGet(uint8_t device_id, const char * device_name){
+  Serial.printf("[MAIN] Query: Device #%d (%s)\n", device_id, device_name);
+  return digitalRead(getRelayNum(device_id));
+}
+
+void pinSetup(){
+  pinMode(RELAY_1, OUTPUT);
+  pinMode(RELAY_2, OUTPUT);
+  pinMode(RELAY_3, OUTPUT);
+  pinMode(LED_CFG, OUTPUT);
+  pinMode(BTN_1, INPUT);
+  pinMode(BTN_2, INPUT);
+  pinMode(BTN_3, INPUT);
+  
+  digitalWrite(RELAY_1, LOW);
+  digitalWrite(RELAY_2, LOW);
+  digitalWrite(RELAY_3, LOW);
+  analogWrite(LED_CFG,led_cfg_brightness);
+
+  attachInterrupt(digitalPinToInterrupt(BTN_1), interrupt1, RISING);
+  attachInterrupt(digitalPinToInterrupt(BTN_2), interrupt2, RISING);
+  attachInterrupt(digitalPinToInterrupt(BTN_3), interrupt3, RISING);
+}
+
+void interrupt1() {interruptRoutine(RELAY_1);}
+void interrupt2() {interruptRoutine(RELAY_2);}
+void interrupt3() {interruptRoutine(RELAY_3);}
+
+void interruptRoutine(int relay){
+  int state = digitalRead(relay);
+  if(state)
+    digitalWrite(relay, LOW);
+  else
+    digitalWrite(relay, HIGH);
+
+  Serial.printf("Relay %d went %s\n", relay, state ? "low" : "high");
+  DelayMilli(BUTTON_DELAY);
+}
+
+void DelayMilli(int milliseconds){
+  Serial.print("      Delay start... ");
+  for (int i=0; i <= milliseconds; i++){
+    delayMicroseconds(1000);
+  }
+  Serial.println("aaaand end");
+}
+
+#ifdef LOUNGE_SWITCH
+#define AP_NAME "SharpTech0002"
+
+void addDevices(){
+  fauxmo.addDevice("lounge light");   // Device 0
+  fauxmo.addDevice("outside light");  // Device 1
+  fauxmo.addDevice("kendys light");   // Device 2
+}
+#endif
+
+#ifdef BATHROOM_SWITCH
+#define AP_NAME "SharpTech0003"
+
+void addDevices(){
+  fauxmo.addDevice("bathroom light"); // Device 0
+  fauxmo.addDevice("kitchen light");  // Device 1
+}
+#endif
+
+#ifdef CAMS_SWITCH
+#define AP_NAME "SharpTech0004"
+
+void addDevices(){
+  fauxmo.addDevice("cams light");   // Device 0
+}
+#endif
