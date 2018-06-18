@@ -1,14 +1,10 @@
 #include <Arduino.h>
 #include <ESP8266WiFi.h>
 #include "fauxmoESP.h"
-#include "ESPAsyncWebServer.h"
-#include <ESPAsyncTCP.h>
-#include <Hash.h>
-/*
+
 #include <DNSServer.h>            //Local DNS Server used for redirecting all requests to the configuration portal
 #include <ESP8266WebServer.h>     //Local WebServer used to serve the configuration portal
 #include <WiFiManager.h>          //https://github.com/tzapu/WiFiManager WiFi Configuration Magic
-*/
 
 
 /* ============== Settings ============== */
@@ -21,9 +17,6 @@
 /* ====================================== */
 
 
-
-#define WIFI_SSID "CamsBay"
-#define WIFI_PASS "randal5544"
 #define SERIAL_BAUDRATE   115200
 
 #define RELAY_1   4
@@ -33,6 +26,16 @@
 #define BTN_2     12
 #define BTN_3     13
 #define LED_CFG   2
+
+#ifdef LOUNGE_SWITCH
+#define AP_NAME "SharpTech0002"
+#endif
+#ifdef BATHROOM_SWITCH
+#define AP_NAME "SharpTech0003"
+#endif
+#ifdef CAMS_SWITCH
+#define AP_NAME "SharpTech0004"
+#endif
 
 /* --------- global variables --------- */
 fauxmoESP fauxmo;
@@ -61,18 +64,18 @@ void loop() {
   //delay(50);
 }
 
-/*
+
 void setupAutoWifiAp(){
     WiFiManager wifiManager;
     wifiManager.setConfigPortalTimeout(180);
-    wifiManager.setAPCallback(configModeCallback);
+    //wifiManager.setAPCallback(configModeCallback);
     wifiManager.autoConnect(AP_NAME);
-    analogWrite(CONFIG_LIGHT,200);
-}*/
+    analogWrite(LED_CFG,200);
+}
 
 void wifiSetup() {
   Serial.printf("[WIFI] Trying to connect ");
-  //setupAutoWifiAp();
+  setupAutoWifiAp();
   
   // Wait
   while (WiFi.status() != WL_CONNECTED) {
@@ -147,8 +150,6 @@ void DelayMilli(int milliseconds){
 }
 
 #ifdef LOUNGE_SWITCH
-#define AP_NAME "SharpTech0002"
-
 void addDevices(){
   fauxmo.addDevice("lounge light");   // Device 0
   fauxmo.addDevice("outside light");  // Device 1
@@ -157,8 +158,6 @@ void addDevices(){
 #endif
 
 #ifdef BATHROOM_SWITCH
-#define AP_NAME "SharpTech0003"
-
 void addDevices(){
   fauxmo.addDevice("bathroom light"); // Device 0
   fauxmo.addDevice("kitchen light");  // Device 1
@@ -166,8 +165,6 @@ void addDevices(){
 #endif
 
 #ifdef CAMS_SWITCH
-#define AP_NAME "SharpTech0004"
-
 void addDevices(){
   fauxmo.addDevice("cams light");   // Device 0
 }
