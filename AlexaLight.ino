@@ -40,6 +40,8 @@
 /* --------- global variables --------- */
 fauxmoESP fauxmo;
 int led_cfg_brightness = 200;
+String header;
+WiFiServer server(80);
 
 void setup() {
   Serial.begin(SERIAL_BAUDRATE);
@@ -57,10 +59,14 @@ void setup() {
   fauxmo.onGetState([](unsigned char device_id, const char * device_name) {
       return foxGet(device_id, device_name);
   });
+  
+  server.begin();
+  Serial.print("Server Running");
 }
 
 void loop() {
   fauxmo.handle();
+  webserver();
   //delay(50);
 }
 
@@ -169,3 +175,79 @@ void addDevices(){
   fauxmo.addDevice("cams light");   // Device 0
 }
 #endif
+
+void webserver(){
+  WiFiClient client = server.available();
+  
+  if (!client)
+    return;
+
+  Serial.println("New Client.");          // print a message out in the serial port
+  String currentLine = "";                // make a String to hold incoming data from the client
+  while (client.connected()) {            // loop while the client's connected
+    if (client.available()) {             // if there's bytes to read from the client,
+      char c = client.read();             // read a byte, then
+      Serial.write(c);                    // print it out the serial monitor
+      header += c;
+      if (c == '\n') {                    // if the byte is a newline character
+        if (currentLine.length() == 0) {
+          // HTTP headers always start with a response code (e.g. HTTP/1.1 200 OK)
+          // and a content-type so the client knows what's coming, then a blank line:
+          client.println("HTTP/1.1 200 OK");
+          client.println("Content-type:text/html");
+          client.println("Connection: close");
+          client.println();
+          
+          if (header.indexOf("GET /inc") >= 0) 
+          {
+            Serial.println("Increased");
+            if (led_cfg_brightness < 10)
+              led_cfg_brightness++;
+          } 
+          else if (header.indexOf("GET /dec") >= 0) 
+          {
+            Serial.println("Decreased");
+            if (led_cfg_brightness > 0)
+              led_cfg_brightness--;
+          }
+          //analogWrite(output5, HIGH);
+          
+          // Display the HTML web page
+          client.println("<!DOCTYPE html><html>");
+          client.println("<head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">");
+          client.println("<link rel=\"icon\" href=\"data:,\">");
+          // CSS to style the buttons 
+          client.println("<style>html { font-family: Helvetica; display: inline-block; margin: 0px auto; text-align: center;}");
+          client.println(".button { background-color: #195B6A; border: none; color: white; padding: 16px 40px;");
+          client.println("text-decoration: none; font-size: 30px; margin: 2px; cursor: pointer;}");
+          client.println(".button2 {background-color: #77878A;}</style></head>");
+          
+          // Web Page Heading
+          client.println("<body><h1>Lounge Light Illuminator</h1>");
+          
+          // Display current state
+          client.println("<p>Brightness " + String(led_cfg_brightness) + "</p>");   
+          client.println("<p><a href=\"/inc\"><button class=\"button\">Increase</button></a></p>");
+          client.println("<p><a href=\"/dec\"><button class=\"button\">Decrease</button></a></p>");
+          client.println("</body></html>");
+          
+          // The HTTP response ends with another blank line
+          client.println();
+          // Break out of the while loop
+          break;
+        } 
+        else
+          currentLine = "";
+      } 
+      else if (c != '\r')
+        currentLine += c;
+    }
+  }
+  // Clear the header variable
+  header = "";
+  // Close the connection
+  client.stop();
+  Serial.println("Client disconnected.");
+  Serial.println("");
+}
+
