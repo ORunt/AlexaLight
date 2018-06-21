@@ -41,7 +41,7 @@
 
 /* --------- global variables --------- */
 fauxmoESP fauxmo;
-int led_cfg_brightness = 200;
+int led_cfg_brightness = 4; // converted value between 0 and 1023
 String header;
 WiFiServer server(80);
 
@@ -69,16 +69,14 @@ void setup() {
 void loop() {
   fauxmo.handle();
   webserver();
-  //delay(50);
 }
 
 
 void setupAutoWifiAp(){
     WiFiManager wifiManager;
-    //wifiManager.setConfigPortalTimeout(180);
-    //wifiManager.setAPCallback(configModeCallback);
+    wifiManager.setAPCallback(configModeCallback);
+    wifiManager.setSaveConfigCallback(saveConfigCallback);
     wifiManager.autoConnect(AP_NAME, "administrator");
-    analogWrite(LED_CFG,200);
 }
 
 void wifiSetup() {
@@ -128,7 +126,7 @@ void pinSetup(){
   digitalWrite(RELAY_1, LOW);
   digitalWrite(RELAY_2, LOW);
   digitalWrite(RELAY_3, LOW);
-  analogWrite(LED_CFG,led_cfg_brightness);
+  analogWrite(LED_CFG,convertBrightness(led_cfg_brightness));
 
   attachInterrupt(digitalPinToInterrupt(BTN_1), interrupt1, RISING);
   attachInterrupt(digitalPinToInterrupt(BTN_2), interrupt2, RISING);
@@ -156,6 +154,22 @@ void DelayMilli(int milliseconds){
     delayMicroseconds(1000);
   }
   Serial.println("aaaand end");
+}
+
+void configModeCallback (WiFiManager *myWiFiManager) {
+  Serial.println("Entered config mode");
+  analogWriteFreq(1);
+  analogWrite(LED_CFG, 500);
+}
+
+void saveConfigCallback () {
+  Serial.println("Settings Saved");
+  analogWriteFreq(1000);
+  analogWrite(LED_CFG,convertBrightness(led_cfg_brightness));
+}
+
+int convertBrightness(int brightness){
+  return (brightness * 1023 / 10);
 }
 
 #ifdef LOUNGE_SWITCH
@@ -213,7 +227,7 @@ void webserver(){
             if (led_cfg_brightness > 0)
               led_cfg_brightness--;
           }
-          //analogWrite(output5, HIGH);
+          analogWrite(LED_CFG,convertBrightness(led_cfg_brightness));
           
           // Display the HTML web page
           client.println("<!DOCTYPE html><html>");
