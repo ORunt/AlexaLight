@@ -6,7 +6,6 @@
 #include <ESP8266WebServer.h>     //Local WebServer used to serve the configuration portal
 #include <WiFiManager.h>          //https://github.com/tzapu/WiFiManager WiFi Configuration Magic
 
-
 /* ============== Settings ============== */
 // define only ONE code compilation
 #define LOUNGE_SWITCH
@@ -29,12 +28,15 @@
 
 #ifdef LOUNGE_SWITCH
 #define AP_NAME "SharpTech0002"
+#define HOST_NAME "loungelight"
 #endif
 #ifdef BATHROOM_SWITCH
 #define AP_NAME "SharpTech0003"
+#define HOST_NAME "bathroomlight"
 #endif
 #ifdef CAMS_SWITCH
 #define AP_NAME "SharpTech0004"
+#define HOST_NAME "camslight"
 #endif
 
 /* --------- global variables --------- */
@@ -73,14 +75,15 @@ void loop() {
 
 void setupAutoWifiAp(){
     WiFiManager wifiManager;
-    wifiManager.setConfigPortalTimeout(180);
+    //wifiManager.setConfigPortalTimeout(180);
     //wifiManager.setAPCallback(configModeCallback);
-    wifiManager.autoConnect(AP_NAME);
+    wifiManager.autoConnect(AP_NAME, "administrator");
     analogWrite(LED_CFG,200);
 }
 
 void wifiSetup() {
   Serial.printf("[WIFI] Trying to connect ");
+  WiFi.hostname(HOST_NAME);
   setupAutoWifiAp();
   
   // Wait
