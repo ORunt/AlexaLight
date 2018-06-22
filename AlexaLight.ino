@@ -169,7 +169,10 @@ void saveConfigCallback () {
 }
 
 int convertBrightness(int brightness){
-  return (brightness * 1023 / 10);
+  if (brightness == 10)
+    return 1023;
+  else
+    return pow(brightness, 3);
 }
 
 #ifdef LOUNGE_SWITCH
