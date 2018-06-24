@@ -6,6 +6,8 @@
 #include <ESP8266WebServer.h>     //Local WebServer used to serve the configuration portal
 #include <WiFiManager.h>          //https://github.com/tzapu/WiFiManager WiFi Configuration Magic
 
+#include <EEPROM.h>
+
 /* ============== Settings ============== */
 // define only ONE code compilation
 #define LOUNGE_SWITCH
@@ -24,7 +26,7 @@
 #define BTN_1     14
 #define BTN_2     12
 #define BTN_3     13
-#define LED_CFG   2
+#define LED_CFG   15  // needs a 3k3 pull down resistor
 
 #ifdef LOUNGE_SWITCH
 #define AP_NAME "SharpTech0002"
@@ -41,12 +43,13 @@
 
 /* --------- global variables --------- */
 fauxmoESP fauxmo;
-int led_cfg_brightness = 4; // converted value between 0 and 1023
+uint8_t led_cfg_brightness; // converted value between 0 and 1023
 String header;
 WiFiServer server(80);
 
 void setup() {
   Serial.begin(SERIAL_BAUDRATE);
+  eepromSetup();
   pinSetup();
   wifiSetup();
 
@@ -112,6 +115,20 @@ void foxSet(uint8_t device_id, const char * device_name, bool state){
 uint8_t foxGet(uint8_t device_id, const char * device_name){
   Serial.printf("[MAIN] Query: Device #%d (%s)\n", device_id, device_name);
   return digitalRead(getRelayNum(device_id));
+}
+
+void eepromSetup(){
+  EEPROM.begin(2);
+  if(EEPROM.read(1) == 100)
+    led_cfg_brightness = EEPROM.read(0);
+  else
+  {
+    led_cfg_brightness = 4; // Initial setup
+    EEPROM.write(0,led_cfg_brightness);
+    EEPROM.write(1,100);
+    EEPROM.commit();
+  }
+  Serial.printf("Eeprom initialized. CFG light brightness at: %d\n", led_cfg_brightness);
 }
 
 void pinSetup(){
@@ -231,6 +248,8 @@ void webserver(){
               led_cfg_brightness--;
           }
           analogWrite(LED_CFG,convertBrightness(led_cfg_brightness));
+          EEPROM.write(0,led_cfg_brightness);
+          EEPROM.commit();
           
           // Display the HTML web page
           client.println("<!DOCTYPE html><html>");
@@ -243,7 +262,7 @@ void webserver(){
           client.println(".button2 {background-color: #77878A;}</style></head>");
           
           // Web Page Heading
-          client.println("<body><h1>Lounge Light Illuminator</h1>");
+          client.println("<body><h1>Touch Light Illuminator</h1>");
           
           // Display current state
           client.println("<p>Brightness " + String(led_cfg_brightness) + "</p>");   
