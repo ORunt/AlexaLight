@@ -10,8 +10,8 @@
 
 /* ============== Settings ============== */
 // define only ONE code compilation
-#define LOUNGE_SWITCH
-//#define BATHROOM_SWITCH
+//#define LOUNGE_SWITCH
+#define BATHROOM_SWITCH
 //#define CAMS_SWITCH
 
 #define BUTTON_DELAY  400
@@ -79,12 +79,13 @@ void setupAutoWifiAp(){
     WiFiManager wifiManager;
     wifiManager.setAPCallback(configModeCallback);
     wifiManager.setSaveConfigCallback(saveConfigCallback);
-    wifiManager.autoConnect(AP_NAME, "administrator");
+    wifiManager.autoConnect(AP_NAME);
 }
 
 void wifiSetup() {
   Serial.printf("[WIFI] Trying to connect ");
   WiFi.hostname(HOST_NAME);
+  delay(20);
   setupAutoWifiAp();
   
   // Wait
